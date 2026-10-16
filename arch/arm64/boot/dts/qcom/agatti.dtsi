@@ -162,6 +162,18 @@
 			interconnects = <&system_noc MASTER_CRYPTO_CORE0 RPM_ALWAYS_TAG
 					 &bimc SLAVE_EBI1 RPM_ALWAYS_TAG>;
 		};
+
+		/*
+		 * OP-TEE (BL32) secure OS. The kernel OP-TEE driver binds to this
+		 * node and issues its conduit-detection SMC to the resident TEE
+		 * (SMC conduit, as OP-TEE runs at S-EL1 under TF-A's opteed SPD on
+		 * agatti). Requires the with-OP-TEE FIP (SPD=opteed, BL32=tee-raw)
+		 * and the optee@46200000 TZDRAM carveout above.
+		 */
+		optee {
+			compatible = "linaro,optee-tz";
+			method = "smc";
+		};
 	};
 
 	memory@40000000 {
@@ -297,6 +309,25 @@
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
+
+		/*
+		 * OP-TEE secure DRAM (TZDRAM). Must match TF-A BL32_BASE/BL32_SIZE
+		 * and OP-TEE CFG_TZDRAM_START plus the TEE/TA RAM sizes for agatti
+		 * (0x46200000, 37 MiB = 4 MiB TEE_RAM + 33 MiB TA_RAM, the same
+		 * split the other Bruin-family targets use). Without this no-map
+		 * carveout Linux allocates over OP-TEE's live secure region and
+		 * corrupts it once the kernel OP-TEE driver issues its first
+		 * conduit SMC.
+		 *
+		 * Sits in the free DDR window between smem (ends 0x46200000) and
+		 * the modem PIL region (starts 0x4ab00000). The earlier 2 MiB at
+		 * 0x40200000 left only 1 MiB of TA RAM, which made xtest fail with
+		 * TEEC_ERROR_OUT_OF_MEMORY on nested TA sessions.
+		 */
+		optee_mem: optee@46200000 {
+			reg = <0x0 0x46200000 0x0 0x2500000>;
+			no-map;
+		};
 
 		hyp_mem: hyp@45700000 {
 			reg = <0x0 0x45700000 0x0 0x600000>;
