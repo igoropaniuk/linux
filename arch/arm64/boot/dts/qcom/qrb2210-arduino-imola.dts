@@ -242,6 +242,7 @@
 };
 
 &qupv3_id_0 {
+	firmware-name = "qcom/qcm2290/qupv3fw.elf";
 	status = "okay";
 };
 
