@@ -2294,6 +2294,8 @@
 
 			memory-region = <&pil_adsp_mem>;
 
+			iommus = <&apps_smmu 0x1c0 0x0>;
+
 			qcom,smem-states = <&adsp_smp2p_out 0>;
 			qcom,smem-state-names = "stop";
 
