@@ -140,10 +140,16 @@
 		idle-states {
 			entry-method = "psci";
 
+			/*
+			 * The open TF-A (uno_q) only implements CPU standby:
+			 * a power-down type state (bit 30) is rejected and
+			 * cpuidle fails to probe. Request standby until true
+			 * power collapse and warm boot exist at EL3.
+			 */
 			cpu_sleep: cpu-sleep-0 {
 				compatible = "arm,idle-state";
-				idle-state-name = "power-collapse";
-				arm,psci-suspend-param = <0x40000003>;
+				idle-state-name = "wfi-retention";
+				arm,psci-suspend-param = <0x00000003>;
 				entry-latency-us = <290>;
 				exit-latency-us = <376>;
 				min-residency-us = <1182>;
