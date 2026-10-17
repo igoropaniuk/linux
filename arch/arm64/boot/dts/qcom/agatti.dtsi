@@ -2568,6 +2568,11 @@
 			interconnect-names = "video-mem",
 					     "cpu-cfg";
 
+			video-firmware {
+				iommus = <&apps_smmu 0x882 0x0>;
+				qcom,tz-loaded;
+			};
+
 			venus_opp_table: opp-table {
 				compatible = "operating-points-v2";
 

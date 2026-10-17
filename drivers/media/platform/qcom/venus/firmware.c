@@ -236,10 +236,29 @@ int venus_boot(struct venus_core *core)
 	core->fw.mem_size = mem_size;
 	core->fw.mem_phys = mem_phys;
 
-	if (core->use_tz)
+	if (core->use_tz) {
+		/*
+		 * The secure side authenticates and starts the core but may
+		 * leave the firmware stream non-secure; then the firmware
+		 * fetches through our IOMMU and needs its image at device
+		 * address 0, like on the non-TZ path.
+		 */
+		if (core->fw.iommu_domain) {
+			ret = iommu_map(core->fw.iommu_domain,
+					VENUS_FW_START_ADDR, mem_phys, mem_size,
+					IOMMU_READ | IOMMU_WRITE | IOMMU_PRIV,
+					GFP_KERNEL);
+			if (ret) {
+				dev_err(dev, "could not map video firmware region\n");
+				return ret;
+			}
+			core->fw.mapped_mem_size = mem_size;
+		}
+
 		ret = qcom_pas_auth_and_reset(VENUS_PAS_ID);
-	else
+	} else {
 		ret = venus_boot_no_tz(core, mem_phys, mem_size);
+	}
 
 	if (ret)
 		return ret;
@@ -274,10 +293,16 @@ int venus_shutdown(struct venus_core *core)
 {
 	int ret;
 
-	if (core->use_tz)
+	if (core->use_tz) {
 		ret = qcom_pas_shutdown(VENUS_PAS_ID);
-	else
+		if (core->fw.mapped_mem_size && core->fw.iommu_domain) {
+			iommu_unmap(core->fw.iommu_domain, VENUS_FW_START_ADDR,
+				    core->fw.mapped_mem_size);
+			core->fw.mapped_mem_size = 0;
+		}
+	} else {
 		ret = venus_shutdown_no_tz(core);
+	}
 
 	return ret;
 }
@@ -315,6 +340,12 @@ int venus_firmware_init(struct venus_core *core)
 		core->use_tz = true;
 		return 0;
 	}
+
+	/*
+	 * The secure side loads and starts the firmware, Linux only owns
+	 * the IOMMU stream the firmware fetches through.
+	 */
+	core->use_tz = of_property_read_bool(np, "qcom,tz-loaded");
 
 	memset(&info, 0, sizeof(info));
 	info.fwnode = &np->fwnode;
