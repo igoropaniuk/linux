@@ -676,6 +676,15 @@
 	firmware-name = "qcm2290";
 
 	status = "okay";
+
+	/*
+	 * The WLAN firmware running on the modem reaches the wlan-msa carveout
+	 * through its own stream; ath10k maps that memory one-to-one in the
+	 * domain of this node.
+	 */
+	wifi-firmware {
+		iommus = <&apps_smmu 0x1a2 0x1>;
+	};
 };
 
 &xo_board {
