@@ -1434,14 +1434,6 @@ static int geni_load_se_fw(struct geni_se *se, const struct firmware *fw,
 	int ret;
 	struct se_fw_hdr *hdr;
 
-	hdr = geni_find_protocol_fw(se, fw, protocol);
-	if (!hdr)
-		return -EINVAL;
-
-	fw_data = (const u32 *)((u8 *)hdr + le16_to_cpu(hdr->fw_offset));
-	cfg_idx_arr = (const u8 *)hdr + le16_to_cpu(hdr->cfg_idx_offset);
-	cfg_val_arr = (const u32 *)((u8 *)hdr + le16_to_cpu(hdr->cfg_val_offset));
-
 	ret = geni_icc_set_bw(se);
 	if (ret)
 		return ret;
@@ -1453,6 +1445,22 @@ static int geni_load_se_fw(struct geni_se *se, const struct firmware *fw,
 	ret = geni_se_resources_on(se);
 	if (ret)
 		goto out_icc_disable;
+
+	/*
+	 * geni_find_protocol_fw() reads SE_HW_PARAM_2 to size the program RAM,
+	 * which needs the engine clocks on: the I2C driver resumes the engine
+	 * before loading, the UART and SPI drivers do not, and an unclocked
+	 * engine reads a depth of 0.
+	 */
+	hdr = geni_find_protocol_fw(se, fw, protocol);
+	if (!hdr) {
+		ret = -EINVAL;
+		goto out_resources_off;
+	}
+
+	fw_data = (const u32 *)((u8 *)hdr + le16_to_cpu(hdr->fw_offset));
+	cfg_idx_arr = (const u8 *)hdr + le16_to_cpu(hdr->cfg_idx_offset);
+	cfg_val_arr = (const u32 *)((u8 *)hdr + le16_to_cpu(hdr->cfg_val_offset));
 
 	/*
 	 * Disable high-priority interrupts until all currently executing
