@@ -819,6 +819,28 @@
 			#power-domain-cells = <1>;
 		};
 
+		eud: eud@1610000 {
+			compatible = "qcom,qcm2290-eud", "qcom,eud";
+			reg = <0x0 0x01610000 0x0 0x2000>,
+			      <0x0 0x01612000 0x0 0x1000>;
+			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
+
+			status = "disabled";
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@0 {
+					reg = <0>;
+
+					eud_ep: endpoint {
+						remote-endpoint = <&usb_dwc3_hs_eud>;
+					};
+				};
+			};
+		};
+
 		usb_hsphy: phy@1613000 {
 			compatible = "qcom,qcm2290-qusb2-phy";
 			reg = <0x0 0x01613000 0x0 0x180>;
@@ -1674,8 +1696,16 @@
 
 					port@0 {
 						reg = <0>;
+						#address-cells = <1>;
+						#size-cells = <0>;
 
-						usb_dwc3_hs: endpoint {
+						usb_dwc3_hs: endpoint@0 {
+							reg = <0>;
+						};
+
+						usb_dwc3_hs_eud: endpoint@1 {
+							reg = <1>;
+							remote-endpoint = <&eud_ep>;
 						};
 					};
 

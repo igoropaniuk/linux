@@ -523,6 +523,10 @@
 	status = "okay";
 };
 
+&eud {
+	status = "okay";
+};
+
 &usb {
 	status = "okay";
 };
