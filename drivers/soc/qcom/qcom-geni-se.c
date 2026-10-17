@@ -1226,6 +1226,50 @@ int geni_se_resources_init(struct geni_se *se)
 EXPORT_SYMBOL_GPL(geni_se_resources_init);
 
 /**
+ * geni_se_is_minicore() - Check whether a protocol runs on a hardware FSM.
+ * @se: Pointer to the concerned serial engine.
+ * @protocol: Protocol to check.
+ *
+ * Minicore serial engines implement the protocol in a hardware state
+ * machine and have no program RAM: SE_HW_PARAM_2 reports a depth of 0 and
+ * sets GEN_USE_MINICORES plus the GEN_HW_FSM bit of each protocol the FSM
+ * can run. Only the revision registers need to be programmed to select the
+ * protocol on them.
+ *
+ * Return: true when the engine runs @protocol on a hardware FSM.
+ */
+static bool geni_se_is_minicore(struct geni_se *se, enum geni_se_protocol_type protocol)
+{
+	u32 val = readl_relaxed(se->base + SE_HW_PARAM_2);
+	u32 fsm;
+
+	if (!(val & GEN_USE_MINICORES))
+		return false;
+
+	switch (protocol) {
+	case GENI_SE_SPI:
+		fsm = GEN_HW_FSM_SPI;
+		break;
+	case GENI_SE_UART:
+		fsm = GEN_HW_FSM_UART;
+		break;
+	case GENI_SE_I2C:
+		fsm = GEN_HW_FSM_I2C;
+		break;
+	case GENI_SE_I3C:
+		fsm = GEN_HW_FSM_I3C;
+		break;
+	case GENI_SE_SPI_SLAVE:
+		fsm = GEN_HW_FSM_SPI_S;
+		break;
+	default:
+		return false;
+	}
+
+	return val & fsm;
+}
+
+/**
  * geni_find_protocol_fw() - Locate and validate SE firmware for a protocol.
  * @se: Pointer to the serial engine structure.
  * @fw: Pointer to the firmware image.
@@ -1308,7 +1352,7 @@ static struct se_fw_hdr *geni_find_protocol_fw(struct geni_se *se, const struct 
 
 		prog_ram_depth = FIELD_GET(PROG_RAM_DEPTH_MSK,
 					   readl_relaxed(se->base + SE_HW_PARAM_2));
-		if (fw_size >= prog_ram_depth) {
+		if (!geni_se_is_minicore(se, protocol) && fw_size >= prog_ram_depth) {
 			dev_err(dev, "Firmware size (%u) exceeds RAM size (%u)\n",
 				fw_size, prog_ram_depth);
 			continue;
@@ -1449,8 +1493,7 @@ static int geni_load_se_fw(struct geni_se *se, const struct firmware *fw,
 	/*
 	 * geni_find_protocol_fw() reads SE_HW_PARAM_2 to size the program RAM,
 	 * which needs the engine clocks on: the I2C driver resumes the engine
-	 * before loading, the UART and SPI drivers do not, and an unclocked
-	 * engine reads a depth of 0.
+	 * before loading, the UART and SPI drivers do not.
 	 */
 	hdr = geni_find_protocol_fw(se, fw, protocol);
 	if (!hdr) {
@@ -1517,9 +1560,10 @@ static int geni_load_se_fw(struct geni_se *se, const struct firmware *fw,
 
 	geni_write_fw_revision(se, le16_to_cpu(hdr->serial_protocol), le16_to_cpu(hdr->fw_version));
 
-	/* Program RAM address space. */
-	memcpy_toio(se->base + SE_GENI_CFG_RAMN, fw_data,
-		    le16_to_cpu(hdr->fw_size_in_items) * sizeof(u32));
+	/* Program RAM address space, unless a hardware FSM runs the protocol. */
+	if (!geni_se_is_minicore(se, protocol))
+		memcpy_toio(se->base + SE_GENI_CFG_RAMN, fw_data,
+			    le16_to_cpu(hdr->fw_size_in_items) * sizeof(u32));
 
 	/* Put default values on GENI's output pads. */
 	writel_relaxed(0x1, se->base + GENI_FORCE_DEFAULT_REG);

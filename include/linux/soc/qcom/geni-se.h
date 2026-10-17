@@ -331,6 +331,12 @@ struct geni_se {
 #define RX_FIFO_DEPTH_SHFT		16
 
 /* SE_HW_PARAM_2 fields */
+#define GEN_HW_FSM_SPI_S		BIT(17)
+#define GEN_HW_FSM_I3C			BIT(16)
+#define GEN_HW_FSM_I2C			BIT(15)
+#define GEN_HW_FSM_UART			BIT(14)
+#define GEN_HW_FSM_SPI			BIT(13)
+#define GEN_USE_MINICORES		BIT(12)
 #define PROG_RAM_DEPTH_MSK		GENMASK(10, 0)
 
 #define HW_VER_MAJOR_MASK		GENMASK(31, 28)
