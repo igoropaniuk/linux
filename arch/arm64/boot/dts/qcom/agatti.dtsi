@@ -1766,6 +1766,7 @@
 
 			gpu_zap_shader: zap-shader {
 				memory-region = <&pil_gpu_mem>;
+				iommus = <&adreno_smmu 0x3 0x0>;
 			};
 
 			gpu_opp_table: opp-table {
