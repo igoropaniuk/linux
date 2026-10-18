@@ -36,6 +36,7 @@ struct eud_chip {
 	struct usb_role_switch		*role_sw;
 	void __iomem			*base;
 	phys_addr_t			mode_mgr;
+	phys_addr_t			tcsr_check;
 	unsigned int			int_status;
 	int				irq;
 	bool				enabled;
@@ -44,11 +45,25 @@ struct eud_chip {
 
 static int enable_eud(struct eud_chip *priv)
 {
+	unsigned int val;
 	int ret;
+
+	/*
+	 * On QCM2290 the boot firmware sets the TCSR check register before
+	 * EUD_EN2; without it the mode manager ignores the enable.
+	 */
+	if (priv->tcsr_check) {
+		ret = qcom_scm_io_writel(priv->tcsr_check, 1);
+		if (ret)
+			return ret;
+	}
 
 	ret = qcom_scm_io_writel(priv->mode_mgr + EUD_REG_EUD_EN2, 1);
 	if (ret)
 		return ret;
+
+	if (!qcom_scm_io_readl(priv->mode_mgr + EUD_REG_EUD_EN2, &val))
+		dev_dbg(priv->dev, "EUD_EN2 reads %u after enable\n", val);
 
 	writel(EUD_ENABLE, priv->base + EUD_REG_CSR_EUD_EN);
 	writel(EUD_INT_VBUS | EUD_INT_SAFE_MODE,
@@ -64,6 +79,9 @@ static int disable_eud(struct eud_chip *priv)
 	ret = qcom_scm_io_writel(priv->mode_mgr + EUD_REG_EUD_EN2, 0);
 	if (ret)
 		return ret;
+
+	if (priv->tcsr_check)
+		qcom_scm_io_writel(priv->tcsr_check, 0);
 
 	writel(0, priv->base + EUD_REG_CSR_EUD_EN);
 	return 0;
@@ -217,6 +235,11 @@ static int eud_probe(struct platform_device *pdev)
 	if (!res)
 		return -ENODEV;
 	chip->mode_mgr = res->start;
+
+	/* Optional TCSR check register, written through the secure IO SMC */
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+	if (res)
+		chip->tcsr_check = res->start;
 
 	chip->irq = platform_get_irq(pdev, 0);
 	if (chip->irq < 0)

@@ -868,7 +868,8 @@
 		eud: eud@1610000 {
 			compatible = "qcom,qcm2290-eud", "qcom,eud";
 			reg = <0x0 0x01610000 0x0 0x2000>,
-			      <0x0 0x01612000 0x0 0x1000>;
+			      <0x0 0x01612000 0x0 0x1000>,
+			      <0x0 0x003e5018 0x0 0x4>;
 			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
 
 			status = "disabled";
