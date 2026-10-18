@@ -174,7 +174,7 @@
 		 * node and issues its conduit-detection SMC to the resident TEE
 		 * (SMC conduit, as OP-TEE runs at S-EL1 under TF-A's opteed SPD on
 		 * agatti). Requires the with-OP-TEE FIP (SPD=opteed, BL32=tee-raw)
-		 * and the optee@46400000 TZDRAM carveout above.
+		 * and the optee@46200000 TZDRAM carveout above.
 		 */
 		optee {
 			compatible = "linaro,optee-tz";
@@ -330,18 +330,8 @@
 		 * 0x40200000 left only 1 MiB of TA RAM, which made xtest fail with
 		 * TEEC_ERROR_OUT_OF_MEMORY on nested TA sessions.
 		 */
-		/*
-		 * TZ-to-modem secure channel page: the modem firmware maps it from
-		 * its own device config and reads the access-control descriptor
-		 * there (magic 0xabcdabc2), so it must not be ordinary RAM.
-		 */
-		modem_secchannel_mem: memory@462c0000 {
-			reg = <0x0 0x462c0000 0x0 0x1000>;
-			no-map;
-		};
-
-		optee_mem: optee@46400000 {
-			reg = <0x0 0x46400000 0x0 0x2500000>;
+		optee_mem: optee@46200000 {
+			reg = <0x0 0x46200000 0x0 0x2500000>;
 			no-map;
 		};
 
