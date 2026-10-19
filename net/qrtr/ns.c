@@ -5,7 +5,6 @@
  * Copyright (c) 2020, Linaro Ltd.
  */
 
-#include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/qrtr.h>
 #include <linux/workqueue.h>
@@ -133,7 +132,6 @@ static int service_announce_new(struct sockaddr_qrtr *dest,
 	struct qrtr_ctrl_pkt pkt;
 	struct msghdr msg = { };
 	struct kvec iv;
-	int retry, ret;
 
 	trace_qrtr_ns_service_announce_new(srv->service, srv->instance,
 					   srv->node, srv->port);
@@ -151,24 +149,7 @@ static int service_announce_new(struct sockaddr_qrtr *dest,
 	msg.msg_name = (struct sockaddr *)dest;
 	msg.msg_namelen = sizeof(*dest);
 
-	/*
-	 * A node that has just said hello may not have its transport ready
-	 * for traffic yet (no rx intents on the glink channel); give it a
-	 * few milliseconds rather than dropping the announcement, which
-	 * would leave the remote without the servers after this one.
-	 */
-	for (retry = 0; retry < 100; retry++) {
-		ret = kernel_sendmsg(qrtr_ns.sock, &msg, &iv, 1, sizeof(pkt));
-		if (ret >= 0 || ret == -ENODEV)
-			break;
-		usleep_range(1000, 2000);
-	}
-	if (ret < 0 && ret != -ENODEV)
-		pr_err("announce of service %u:%u to %d:%d failed: %d after %d tries\n",
-		       srv->service, srv->instance, dest->sq_node, dest->sq_port,
-		       ret, retry);
-
-	return ret;
+	return kernel_sendmsg(qrtr_ns.sock, &msg, &iv, 1, sizeof(pkt));
 }
 
 static void service_announce_del(struct sockaddr_qrtr *dest,
@@ -251,7 +232,7 @@ static int announce_servers(struct sockaddr_qrtr *sq)
 				continue;
 
 			pr_err("failed to announce new service\n");
-			/* keep going: the remote needs the others no less */
+			return ret;
 		}
 	}
 	return 0;
@@ -507,13 +488,10 @@ static int ctrl_cmd_new_server(struct sockaddr_qrtr *from,
 
 	if (srv->node == qrtr_ns.local_node) {
 		ret = service_announce_new(&qrtr_ns.bcast_sq, srv);
-		if (ret < 0)
+		if (ret < 0) {
 			pr_err("failed to announce new service\n");
-		/*
-		 * Do not bail out: a lookup registered for this service by
-		 * a remote node must still be notified, otherwise that node
-		 * never learns the server exists.
-		 */
+			return ret;
+		}
 	}
 
 	/* Notify any potential lookups about the new server */
